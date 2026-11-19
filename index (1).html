@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UA Pay Link — рахунки в USDC/SOL через Solana Pay</title>
+<meta name="description" content="Безкоштовний генератор рахунків з QR-кодом для оплати в USDC або SOL через Solana Pay. Українською. Без реєстрації, без сервера, з автоматичною перевіркою оплати.">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#14171c;--muted:#5b6472;--line:#e3e6eb;--accent:#7c3aed;--ok:#0f9d58;--warn:#b45309;--err:#c62828}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
+  .wrap{max-width:560px;margin:0 auto;padding:20px 16px 48px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  h1{font-size:22px;margin:0}
+  .lang{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:14px}
+  .sub{color:var(--muted);margin:0 0 18px;font-size:15px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  label{display:block;font-size:14px;font-weight:600;margin:12px 0 6px}
+  input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:#fff;color:var(--ink)}
+  textarea{resize:vertical;min-height:60px}
+  .row{display:flex;gap:10px}
+  .row>div{flex:1}
+  .hint{font-size:13px;color:var(--muted);margin-top:4px}
+  button.primary{width:100%;margin-top:18px;padding:13px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+  button.sec{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:14px;cursor:pointer;color:var(--ink)}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .btns a,.btns button{flex:1 1 45%;text-align:center;text-decoration:none}
+  a.walletbtn{display:block;padding:10px 12px;border-radius:10px;background:var(--ink);color:#fff;font-size:14px}
+  .qr{display:flex;justify-content:center;margin:8px 0}
+  .qr img{width:260px;height:260px;image-rendering:pixelated}
+  .sum{font-size:26px;font-weight:700;text-align:center;margin:4px 0}
+  .meta{text-align:center;color:var(--muted);font-size:14px}
+  .status{margin-top:14px;padding:12px;border-radius:10px;font-size:15px;text-align:center}
+  .st-wait{background:#f3f0ff;color:var(--accent)}
+  .st-ok{background:#e8f6ee;color:var(--ok)}
+  .st-bad{background:#fdecec;color:var(--err)}
+  .st-warn{background:#fff6e5;color:var(--warn)}
+  .err{color:var(--err);font-size:14px;margin-top:8px}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;color:var(--muted)}
+  details{margin-top:10px}
+  summary{cursor:pointer;color:var(--muted);font-size:14px}
+  .hist-item{border-top:1px solid var(--line);padding:10px 0;font-size:14px;display:flex;justify-content:space-between;gap:8px}
+  .hist-item a{color:var(--accent)}
+  footer{color:var(--muted);font-size:13px;text-align:center;margin-top:20px}
+  footer a{color:var(--muted)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>⚡ UA Pay Link</h1>
+    <button class="lang" id="langBtn">EN</button>
+  </header>
+  <p class="sub" data-i18n="tagline">Рахунок з QR-кодом для оплати в USDC або SOL за 10 секунд. Без реєстрації, без сервера, гроші йдуть напряму на ваш гаманець.</p>
+
+  <!-- Creator form -->
+  <div class="card" id="formCard">
+    <label for="to" data-i18n="toLabel">Ваша адреса гаманця Solana</label>
+    <input id="to" autocomplete="off" spellcheck="false" placeholder="Напр. 7xKX...">
+    <div class="hint" data-i18n="toHint">Гроші прийдуть саме сюди. Ми не маємо доступу до ваших коштів.</div>
+
+    <div class="row">
+      <div>
+        <label for="amount" data-i18n="amountLabel">Сума</label>
+        <input id="amount" inputmode="decimal" placeholder="25">
+      </div>
+      <div>
+        <label for="token" data-i18n="tokenLabel">Валюта</label>
+        <select id="token">
+          <option value="USDC">USDC</option>
+          <option value="SOL">SOL</option>
+        </select>
+      </div>
+    </div>
+
+    <label for="label" data-i18n="labelLabel">Від кого (ім'я або бренд)</label>
+    <input id="label" maxlength="60" placeholder="Сергій — дизайн">
+
+    <label for="message" data-i18n="msgLabel">За що (опис / номер замовлення)</label>
+    <textarea id="message" maxlength="140" placeholder="Логотип, замовлення №12"></textarea>
+
+    <div class="err hidden" id="formErr"></div>
+    <button class="primary" id="createBtn" data-i18n="createBtn">Створити рахунок</button>
+  </div>
+
+  <!-- Invoice view -->
+  <div class="card hidden" id="invoiceCard">
+    <div class="sum" id="invSum"></div>
+    <div class="meta" id="invMeta"></div>
+    <div class="qr" id="qr"></div>
+    <div class="meta" data-i18n="scanHint">Відскануйте QR у Phantom, Solflare чи іншому гаманці з Solana Pay</div>
+    <div class="btns">
+      <a class="walletbtn" id="walletLink" href="#" data-i18n="openWallet">Відкрити в гаманці</a>
+      <button class="sec" id="copyInvoice" data-i18n="copyInvoice">Скопіювати посилання на рахунок</button>
+    </div>
+    <div class="status st-wait" id="status" data-i18n="waiting">Очікуємо оплату…</div>
+    <details>
+      <summary data-i18n="techDetails">Технічні деталі</summary>
+      <div class="mono" id="payUrl"></div>
+      <label for="rpc" data-i18n="rpcLabel">RPC-вузол (необов'язково)</label>
+      <input id="rpc" spellcheck="false">
+      <div class="hint" data-i18n="rpcHint">Якщо перевірка оплати не працює, вставте свій RPC (напр. від Helius).</div>
+    </details>
+    <div class="btns"><button class="sec" id="newBtn" data-i18n="newBtn">Новий рахунок</button></div>
+  </div>
+
+  <!-- History -->
+  <div class="card hidden" id="histCard">
+    <strong data-i18n="history">Мої рахунки (лише на цьому пристрої)</strong>
+    <div id="hist"></div>
+  </div>
+
+  <footer>
+    <span data-i18n="footer">Відкритий код · Працює на Solana Pay · Без збору даних</span><br>
+    <a href="https://docs.solanapay.com/spec" target="_blank" rel="noopener">Solana Pay spec</a>
+  </footer>
+</div>
+
+<script>
+"use strict";
+// ---------- constants ----------
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const TOKENS = { SOL: { decimals: 9, mint: null }, USDC: { decimals: 6, mint: USDC_MINT } };
+const DEFAULT_RPC = "https://api.mainnet-beta.solana.com";
+const POLL_MS = 5000;
+
+// ---------- i18n ----------
+const I18N = {
+  uk: {
+    tagline:"Рахунок з QR-кодом для оплати в USDC або SOL за 10 секунд. Без реєстрації, без сервера, гроші йдуть напряму на ваш гаманець.",
+    toLabel:"Ваша адреса гаманця Solana", toHint:"Гроші прийдуть саме сюди. Ми не маємо доступу до ваших коштів.",
+    amountLabel:"Сума", tokenLabel:"Валюта", labelLabel:"Від кого (ім'я або бренд)", msgLabel:"За що (опис / номер замовлення)",
+    createBtn:"Створити рахунок", scanHint:"Відскануйте QR у Phantom, Solflare чи іншому гаманці з Solana Pay",
+    openWallet:"Відкрити в гаманці", copyInvoice:"Скопіювати посилання на рахунок", copied:"Скопійовано ✓",
+    waiting:"Очікуємо оплату…", found:"Знайдено транзакцію, перевіряємо…", paid:"✅ Оплачено", underpaid:"⚠️ Транзакцію знайдено, але сума менша або інша валюта",
+    failed:"❌ Транзакція завершилась з помилкою", rpcErr:"Не вдалося перевірити оплату (RPC недоступний). Спробуємо ще раз…",
+    techDetails:"Технічні деталі", rpcLabel:"RPC-вузол (необов'язково)", rpcHint:"Якщо перевірка оплати не працює, вставте свій RPC (напр. від Helius).",
+    newBtn:"Новий рахунок", history:"Мої рахунки (лише на цьому пристрої)", footer:"Відкритий код · Працює на Solana Pay · Без збору даних",
+    errAddr:"Невірна адреса гаманця Solana.", errAmount:"Вкажіть суму більше нуля (не більше {d} знаків після коми).", viewTx:"Переглянути транзакцію",
+    pending:"очікує", paidShort:"оплачено"
+  },
+  en: {
+    tagline:"Create a QR invoice for USDC or SOL payments in 10 seconds. No sign-up, no server, funds go straight to your wallet.",
+    toLabel:"Your Solana wallet address", toHint:"Payments go directly here. We never touch your funds.",
+    amountLabel:"Amount", tokenLabel:"Currency", labelLabel:"From (name or brand)", msgLabel:"For (description / order ID)",
+    createBtn:"Create invoice", scanHint:"Scan the QR with Phantom, Solflare or any Solana Pay wallet",
+    openWallet:"Open in wallet", copyInvoice:"Copy invoice link", copied:"Copied ✓",
+    waiting:"Waiting for payment…", found:"Transaction found, verifying…", paid:"✅ Paid", underpaid:"⚠️ Transaction found, but the amount or currency doesn't match",
+    failed:"❌ Transaction failed", rpcErr:"Couldn't check payment (RPC unavailable). Retrying…",
+    techDetails:"Technical details", rpcLabel:"RPC endpoint (optional)", rpcHint:"If payment checking doesn't work, paste your own RPC URL (e.g. from Helius).",
+    newBtn:"New invoice", history:"My invoices (this device only)", footer:"Open source · Powered by Solana Pay · No data collection",
+    errAddr:"Invalid Solana wallet address.", errAmount:"Enter an amount above zero (max {d} decimal places).", viewTx:"View transaction",
+    pending:"pending", paidShort:"paid"
+  }
+};
+let lang = "uk";
+{
+  let saved = null;
+  try { saved = localStorage.getItem("uapay_lang"); } catch (e) {}
+  lang = (saved === "uk" || saved === "en") ? saved : ((navigator.language || "").toLowerCase().startsWith("uk") ? "uk" : "en");
+}
+const t = (k) => (I18N[lang] && I18N[lang][k]) || I18N.uk[k] || k;
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.getElementById("langBtn").textContent = lang === "uk" ? "EN" : "UA";
+  renderHistory();
+}
+
+// ---------- base58 ----------
+const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+function b58encode(bytes) {
+  let digits = [];
+  for (const byte of bytes) {
+    let carry = byte;
+    for (let j = 0; j < digits.length; j++) { carry += digits[j] << 8; digits[j] = carry % 58; carry = (carry / 58) | 0; }
+    while (carry) { digits.push(carry % 58); carry = (carry / 58) | 0; }
+  }
+  let out = "";
+  for (const byte of bytes) { if (byte === 0) out += "1"; else break; }
+  for (let i = digits.length - 1; i >= 0; i--) out += B58[digits[i]];
+  return out;
+}
+function b58decode(str) {
+  if (typeof str !== "string" || !str.length) return null;
+  let bytes = [];
+  for (const ch of str) {
+    const v = B58.indexOf(ch);
+    if (v < 0) return null;
+    let carry = v;
+    for (let j = 0; j < bytes.length; j++) { carry += bytes[j] * 58; bytes[j] = carry & 0xff; carry >>= 8; }
+    while (carry) { bytes.push(carry & 0xff); carry >>= 8; }
+  }
+  for (const ch of str) { if (ch === "1") bytes.push(0); else break; }
+  return new Uint8Array(bytes.reverse());
+}
+const isPubkey = (s) => { const d = b58decode((s || "").trim()); return !!d && d.length === 32; };
+
+// ---------- amounts (no floats) ----------
+function normAmount(str, decimals) {
+  str = (str || "").trim().replace(",", ".");
+  if (!/^\d+(\.\d+)?$/.test(str)) return null;
+  let [ip, fp = ""] = str.split(".");
+  if (fp.length > decimals) return null;
+  ip = ip.replace(/^0+(?=\d)/, "");
+  fp = fp.replace(/0+$/, "");
+  const display = fp ? `${ip}.${fp}` : ip;
+  const base = BigInt(ip + fp.padEnd(decimals, "0"));
+  if (base <= 0n) return null;
+  return { display, base };
+}
+
+// ---------- Solana Pay URL ----------
+function buildPayUrl(inv) {
+  const p = [`amount=${inv.amount}`];
+  if (TOKENS[inv.token].mint) p.push(`spl-token=${TOKENS[inv.token].mint}`);
+  p.push(`reference=${inv.ref}`);
+  if (inv.label) p.push(`label=${encodeURIComponent(inv.label)}`);
+  if (inv.message) p.push(`message=${encodeURIComponent(inv.message)}`);
+  return `solana:${inv.to}?${p.join("&")}`;
+}
+function invoiceLink(inv) {
+  const q = new URLSearchParams({ to: inv.to, amount: inv.amount, token: inv.token, ref: inv.ref });
+  if (inv.label) q.set("label", inv.label);
+  if (inv.message) q.set("msg", inv.message);
+  return `${location.origin}${location.pathname}#${q.toString()}`;
+}
+function newReference() { const b = new Uint8Array(32); crypto.getRandomValues(b); return b58encode(b); }
+
+// ---------- RPC ----------
+function rpcUrl() { const v = document.getElementById("rpc").value.trim(); return v || DEFAULT_RPC; }
+async function rpc(method, params) {
+  const r = await fetch(rpcUrl(), { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "RPC error");
+  return j.result;
+}
+// Returns {state:'paid'|'underpaid'|'failed', sig} or null if nothing found yet
+async function checkPayment(inv) {
+  const sigs = await rpc("getSignaturesForAddress", [inv.ref, { limit: 10, commitment: "confirmed" }]);
+  if (!sigs || !sigs.length) return null;
+  setStatus("st-wait", t("found"));
+  let last = null;
+  for (const s of sigs.slice().reverse()) {
+    const tx = await rpc("getTransaction", [s.signature, { encoding: "jsonParsed", commitment: "confirmed", maxSupportedTransactionVersion: 0 }]);
+    if (!tx) continue;
+    if (tx.meta && tx.meta.err) { last = { state: "failed", sig: s.signature }; continue; }
+    const received = receivedAmount(tx, inv);
+    if (received >= normAmount(inv.amount, TOKENS[inv.token].decimals).base) return { state: "paid", sig: s.signature };
+    last = { state: "underpaid", sig: s.signature };
+  }
+  return last;
+}
+function receivedAmount(tx, inv) {
+  const keys = tx.transaction.message.accountKeys.map(k => (typeof k === "string" ? k : k.pubkey));
+  if (inv.token === "SOL") {
+    const i = keys.indexOf(inv.to);
+    if (i < 0) return 0n;
+    return BigInt(tx.meta.postBalances[i]) - BigInt(tx.meta.preBalances[i]);
+  }
+  const mint = TOKENS[inv.token].mint;
+  const sum = (arr) => (arr || []).filter(b => b.mint === mint && b.owner === inv.to)
+    .reduce((a, b) => a + BigInt(b.uiTokenAmount.amount), 0n);
+  return sum(tx.meta.postTokenBalances) - sum(tx.meta.preTokenBalances);
+}
+
+// ---------- history (this device only) ----------
+function loadHist() { try { return JSON.parse(localStorage.getItem("uapay_hist") || "[]"); } catch (e) { return []; } }
+function saveHist(h) { try { localStorage.setItem("uapay_hist", JSON.stringify(h.slice(0, 30))); } catch (e) {} }
+function upsertHist(inv) { const h = loadHist().filter(x => x.ref !== inv.ref); h.unshift(inv); saveHist(h); renderHistory(); }
+function renderHistory() {
+  const h = loadHist(); const card = document.getElementById("histCard"); const box = document.getElementById("hist");
+  if (!h.length) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden"); box.innerHTML = "";
+  for (const inv of h) {
+    const row = document.createElement("div"); row.className = "hist-item";
+    const left = document.createElement("span");
+    left.textContent = `${inv.amount} ${inv.token}${inv.message ? " · " + inv.message : ""}`;
+    const a = document.createElement("a"); a.href = invoiceLink(inv);
+    a.textContent = inv.paid ? t("paidShort") : t("pending");
+    a.addEventListener("click", (e) => { e.preventDefault(); showInvoice(inv); });
+    row.append(left, a); box.append(row);
+  }
+}
+
+// ---------- UI ----------
+let pollTimer = null;
+function setStatus(cls, html) { const s = document.getElementById("status"); s.className = "status " + cls; s.innerHTML = html; }
+function stopPoll() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } }
+
+function showInvoice(inv) {
+  stopPoll();
+  document.getElementById("formCard").classList.add("hidden");
+  document.getElementById("invoiceCard").classList.remove("hidden");
+  const url = buildPayUrl(inv);
+  document.getElementById("invSum").textContent = `${inv.amount} ${inv.token}`;
+  document.getElementById("invMeta").textContent = [inv.label, inv.message].filter(Boolean).join(" · ");
+  document.getElementById("payUrl").textContent = url;
+  document.getElementById("walletLink").href = url;
+  const qrBox = document.getElementById("qr"); qrBox.innerHTML = "";
+  if (typeof qrcode === "function") {
+    const q = qrcode(0, "M"); q.addData(url); q.make();
+    qrBox.innerHTML = q.createImgTag(6, 8);
+  } else {
+    qrBox.textContent = "QR library failed to load";
+  }
+  history.replaceState(null, "", invoiceLink(inv));
+  setStatus("st-wait", t("waiting"));
+  const tick = async () => {
+    try {
+      const res = await checkPayment(inv);
+      if (res) {
+        const link = `<br><a href="https://solscan.io/tx/${res.sig}" target="_blank" rel="noopener">${t("viewTx")}</a>`;
+        if (res.state === "paid") { setStatus("st-ok", t("paid") + link); inv.paid = true; upsertHist(inv); return; }
+        if (res.state === "failed") setStatus("st-bad", t("failed") + link);
+        else setStatus("st-warn", t("underpaid") + link);
+      }
+    } catch (e) { setStatus("st-warn", t("rpcErr")); }
+    pollTimer = setTimeout(tick, POLL_MS);
+  };
+  tick();
+}
+
+function showForm() {
+  stopPoll();
+  history.replaceState(null, "", location.pathname);
+  document.getElementById("invoiceCard").classList.add("hidden");
+  document.getElementById("formCard").classList.remove("hidden");
+}
+
+function fromHash() {
+  if (!location.hash || location.hash.length < 2) return null;
+  const q = new URLSearchParams(location.hash.slice(1));
+  const inv = { to: (q.get("to") || "").trim(), token: q.get("token") === "SOL" ? "SOL" : "USDC",
+    ref: (q.get("ref") || "").trim(), label: q.get("label") || "", message: q.get("msg") || "" };
+  const amt = normAmount(q.get("amount"), TOKENS[inv.token].decimals);
+  if (!isPubkey(inv.to) || !isPubkey(inv.ref) || !amt) return null;
+  inv.amount = amt.display;
+  return inv;
+}
+
+document.getElementById("createBtn").addEventListener("click", () => {
+  const err = document.getElementById("formErr"); err.classList.add("hidden");
+  const to = document.getElementById("to").value.trim();
+  const token = document.getElementById("token").value;
+  if (!isPubkey(to)) { err.textContent = t("errAddr"); err.classList.remove("hidden"); return; }
+  const amt = normAmount(document.getElementById("amount").value, TOKENS[token].decimals);
+  if (!amt) { err.textContent = t("errAmount").replace("{d}", TOKENS[token].decimals); err.classList.remove("hidden"); return; }
+  const inv = { to, token, amount: amt.display, ref: newReference(),
+    label: document.getElementById("label").value.trim(), message: document.getElementById("message").value.trim(),
+    created: Date.now(), paid: false };
+  upsertHist(inv);
+  showInvoice(inv);
+});
+document.getElementById("newBtn").addEventListener("click", showForm);
+document.getElementById("copyInvoice").addEventListener("click", async (e) => {
+  try { await navigator.clipboard.writeText(location.href); e.target.textContent = t("copied");
+    setTimeout(() => { e.target.textContent = t("copyInvoice"); }, 1500); } catch (x) {}
+});
+document.getElementById("langBtn").addEventListener("click", () => {
+  lang = lang === "uk" ? "en" : "uk";
+  try { localStorage.setItem("uapay_lang", lang); } catch (e) {}
+  applyLang();
+});
+
+applyLang();
+const fromLink = fromHash();
+if (fromLink) showInvoice(fromLink);
+</script>
+</body>
+</html>
